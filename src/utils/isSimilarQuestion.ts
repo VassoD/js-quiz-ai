@@ -4,33 +4,55 @@ export function isSimilarQuestion(
   newQuestion: string,
   previousQuestions: string
 ): boolean {
+  // Debug logging
+  console.log("Previous questions received:", previousQuestions);
+  console.log("New question:", newQuestion);
+
   // If no previous questions, it can't be similar
-  if (!previousQuestions) {
+  if (!previousQuestions || typeof previousQuestions !== "string") {
+    console.log("No previous questions or invalid type, returning false");
     return false;
   }
 
-  // Split the previous questions string into an array
-  const prevQuestions = previousQuestions.split(",");
+  try {
+    // Split the previous questions string into an array, handling both comma and newline separators
+    const prevQuestions = previousQuestions
+      .split(/[,\n]/)
+      .map((q) => q.trim())
+      .filter((q) => q.length > 0)
+      // Take only the last 10 questions to prevent performance issues
+      .slice(-10);
 
-  // Extract key concepts from the new question
-  const newConcepts = extractConcepts(newQuestion);
-
-  // Compare with each previous question
-  for (const prevQuestion of prevQuestions) {
-    const prevConcepts = extractConcepts(prevQuestion);
-
-    // Calculate concept overlap
-    const similarity = calculateConceptSimilarity(newConcepts, prevConcepts);
-
-    if (similarity > SIMILARITY_THRESHOLD) {
-      console.log(`Question similarity: ${similarity}`);
-      console.log("New question:", newQuestion);
-      console.log("Similar to:", prevQuestion);
-      return true;
+    // If no valid previous questions after splitting, return false
+    if (prevQuestions.length === 0) {
+      console.log("No valid questions after splitting, returning false");
+      return false;
     }
-  }
 
-  return false;
+    // Extract key concepts from the new question
+    const newConcepts = extractConcepts(newQuestion);
+
+    // Compare with each previous question
+    for (const prevQuestion of prevQuestions) {
+      const prevConcepts = extractConcepts(prevQuestion);
+
+      // Calculate concept overlap
+      const similarity = calculateConceptSimilarity(newConcepts, prevConcepts);
+
+      if (similarity > SIMILARITY_THRESHOLD) {
+        console.log(`Question similarity: ${similarity}`);
+        console.log("New question:", newQuestion);
+        console.log("Similar to:", prevQuestion);
+        return true;
+      }
+    }
+
+    return false;
+  } catch (error) {
+    console.error("Error in isSimilarQuestion:", error);
+    // If there's an error, return false to allow the question
+    return false;
+  }
 }
 
 function extractConcepts(question: string): string[] {
