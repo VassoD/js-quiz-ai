@@ -20,6 +20,9 @@ interface QuizState {
   lastQuestionType?: Topic;
   topicProgress: Record<Topic, TopicProgress>;
   currentLevel: Difficulty;
+  isCustomMode: boolean;
+  customQuestions: Question[];
+  usedCustomQuestions: Set<string>;
 }
 
 interface AnsweredQuestion {
@@ -61,6 +64,9 @@ const initialState: QuizState = {
   answeredTopics: new Set(),
   topicProgress: initialTopicProgress,
   currentLevel: "easy",
+  isCustomMode: false,
+  customQuestions: [],
+  usedCustomQuestions: new Set(),
 };
 
 export const useQuiz = () => {
@@ -123,110 +129,16 @@ export const useQuiz = () => {
     }
   }, [state, answeredQuestions, isInitialized]);
 
-  const isLevelComplete = useCallback(
-    (level: Difficulty): boolean => {
-      const levelTopics = topics[level];
-      return levelTopics.every(
-        (topic) => state.topicProgress[topic]?.mastered ?? false
-      );
-    },
-    [state.topicProgress]
-  );
-
-  const updateTopicProgress = useCallback(
-    (topic: Topic, isCorrect: boolean) => {
-      setState((prev) => {
-        const currentProgress = prev.topicProgress[topic];
-        const newProgress = {
-          total: currentProgress.total + 1,
-          correct: currentProgress.correct + (isCorrect ? 1 : 0),
-          mastered: false,
-        };
-
-        // Topic is mastered if accuracy is >= 80% with at least 3 questions answered
-        newProgress.mastered =
-          newProgress.total >= 3 &&
-          newProgress.correct / newProgress.total >= 0.8;
-
-        // Check if should advance to next level
-        let newLevel = prev.currentLevel;
-        if (isLevelComplete(prev.currentLevel)) {
-          if (prev.currentLevel === "easy") newLevel = "medium";
-          else if (prev.currentLevel === "medium") newLevel = "hard";
-        }
-
-        return {
-          ...prev,
-          topicProgress: {
-            ...prev.topicProgress,
-            [topic]: newProgress,
-          },
-          currentLevel: newLevel,
-        };
-      });
-    },
-    [isLevelComplete]
-  );
-
   const loadQuestion = useCallback(async () => {
-    console.log("🎯 Starting loadQuestion");
-
-    if (state.questions[state.currentQuestionIndex]) {
-      console.log("⏭️ Question already exists for current index");
-      return;
-    }
-
     try {
       setLoading(true);
-      const newDifficulty = state.currentLevel;
-      const answeredTopics = state.answeredTopics || new Set<Topic>();
+      setError(null);
 
-      console.log("📊 Current state before fetch:", {
-        difficulty: newDifficulty,
-        answeredTopics: Array.from(answeredTopics),
-        currentIndex: state.currentQuestionIndex,
-        questionsCount: state.questions.length,
-      });
-
-      const levelTopics = topics[newDifficulty];
-
-      // If all topics in current level are mastered, move to next level
-      if (levelTopics.every((topic) => state.topicProgress[topic]?.mastered)) {
-        setState((prev) => ({
-          ...prev,
-          currentLevel:
-            prev.currentLevel === "easy"
-              ? "medium"
-              : prev.currentLevel === "medium"
-              ? "hard"
-              : "hard",
-          answeredTopics: new Set(), // Reset answered topics for new level
-        }));
-        return; // Return and let next render trigger new question load
-      }
-
-      const appropriateTopics = levelTopics.filter(
-        (topic) => !answeredTopics.has(topic)
-      );
-
-      // If all topics have been used, reset the set and try again
-      if (appropriateTopics.length === 0) {
-        answeredTopics.clear();
-        appropriateTopics.push(...levelTopics);
-      }
-
-      // Pick a random topic, avoiding the last one if possible
-      let randomTopic: Topic;
-      if (appropriateTopics.length > 1 && state.lastQuestionType) {
-        randomTopic =
-          appropriateTopics.find((t) => t !== state.lastQuestionType) ??
-          appropriateTopics[0];
-      } else {
-        randomTopic =
-          appropriateTopics[
-            Math.floor(Math.random() * appropriateTopics.length)
-          ];
-      }
+      const getNextTopic = (): Topic => {
+        const levelTopics = topics[state.difficulty];
+        const randomIndex = Math.floor(Math.random() * levelTopics.length);
+        return levelTopics[randomIndex];
+      };
 
       const response = await fetch("/api/quiz", {
         method: "POST",
@@ -234,101 +146,86 @@ export const useQuiz = () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          topic: randomTopic,
-          difficulty: newDifficulty,
-          excludePatterns: state.questions.map((q) => q.question).join(","),
+          topic: getNextTopic(),
+          difficulty: state.difficulty,
+          excludePatterns: state.questions
+            .map((q) => q.question)
+            .join(" ")
+            .substring(0, 100),
         }),
       });
 
-      if (response.status === 429) {
-        const retryAfter = response.headers.get("retry-after");
-        const waitTime = (parseInt(retryAfter || "5") + 1) * 1000;
-        setError(
-          `Rate limit reached. Please wait ${Math.ceil(
-            waitTime / 1000
-          )} seconds before trying again.`
-        );
-        return;
-      }
-
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to fetch question");
+        throw new Error("Failed to load question");
       }
 
-      const newQuestion: Question = await response.json();
-      console.log("📥 Received new question:", newQuestion);
+      const question = await response.json();
 
       setState((prev) => ({
         ...prev,
-        questions: [...prev.questions, newQuestion],
-        difficulty: newDifficulty,
-        answeredTopics: new Set([...answeredTopics, randomTopic]),
-        lastQuestionType: randomTopic,
+        questions: [question],
+        currentQuestionIndex: 0,
       }));
-    } catch (err) {
-      console.error("❌ Error in loadQuestion:", err);
+    } catch (error) {
       setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to load question. Please try again."
+        error instanceof Error ? error.message : "Failed to load question"
       );
     } finally {
       setLoading(false);
     }
-  }, [
-    state.questions,
-    state.currentQuestionIndex,
-    state.answeredTopics,
-    state.lastQuestionType,
-    state.currentLevel,
-    state.topicProgress,
-  ]);
+  }, [state.questions, state.difficulty]);
 
   const handleAnswer = useCallback(
     (answer: string) => {
-      const currentQ = state.questions[state.currentQuestionIndex];
-      const isCorrect = answer === currentQ?.correctAnswer;
+      const currentQuestion = state.questions[state.currentQuestionIndex];
+      if (!currentQuestion) return;
 
-      // Update topic progress
-      updateTopicProgress(currentQ.topic, isCorrect);
+      const isCorrect = answer === currentQuestion.correctAnswer;
+      const topic = currentQuestion.topic;
 
-      // Update answered questions history
+      setState((prev) => {
+        // Skip topic progress for custom quizzes or unknown topics
+        if (prev.isCustomMode || !prev.topicProgress[topic]) {
+          return {
+            ...prev,
+            score: prev.score + (isCorrect ? 100 : 0),
+            streak: isCorrect ? prev.streak + 1 : 0,
+            correctAnswersInRow: isCorrect ? prev.correctAnswersInRow + 1 : 0,
+          };
+        }
+
+        // For known topics, update progress
+        const currentProgress = prev.topicProgress[topic];
+        const newProgress = {
+          total: currentProgress.total + 1,
+          correct: currentProgress.correct + (isCorrect ? 1 : 0),
+          mastered: false,
+        };
+
+        return {
+          ...prev,
+          score: prev.score + (isCorrect ? 100 : 0),
+          streak: isCorrect ? prev.streak + 1 : 0,
+          correctAnswersInRow: isCorrect ? prev.correctAnswersInRow + 1 : 0,
+          topicProgress: {
+            ...prev.topicProgress,
+            [topic]: newProgress,
+          },
+        };
+      });
+
       setAnsweredQuestions((prev) => [
         ...prev,
         {
-          question: currentQ,
+          question: currentQuestion,
           userAnswer: answer,
           isCorrect,
           timestamp: new Date(),
         },
       ]);
-
-      setState((prev) => ({
-        ...prev,
-        correctAnswersInRow: isCorrect ? prev.correctAnswersInRow + 1 : 0,
-        streak: isCorrect ? prev.streak + 1 : 0,
-        score: isCorrect
-          ? prev.score + calculatePoints(prev.difficulty, prev.streak)
-          : prev.score,
-      }));
     },
-    [state.currentQuestionIndex, state.questions, updateTopicProgress]
+    [state.currentQuestionIndex, state.questions]
   );
-
-  const calculatePoints = (
-    difficulty: Difficulty,
-    currentStreak: number
-  ): number => {
-    const basePoints = {
-      easy: 100,
-      medium: 200,
-      hard: 300,
-    }[difficulty];
-
-    const streakBonus = currentStreak * 10;
-    return basePoints + streakBonus;
-  };
 
   const resetQuiz = useCallback(() => {
     setState(initialState);
@@ -349,32 +246,104 @@ export const useQuiz = () => {
   // };
 
   const nextQuestion = useCallback(() => {
-    console.log("⏭️ Moving to next question", {
-      currentIndex: state.currentQuestionIndex,
-      totalQuestions: state.questions.length,
-    });
-
     setState((prev) => {
       const nextIndex = prev.currentQuestionIndex + 1;
-      console.log("📊 Next question state", {
-        nextIndex,
-        hasNextQuestion: !!prev.questions[nextIndex],
-      });
+      const hasNextQuestion =
+        prev.questions && nextIndex < prev.questions.length;
+
+      // If we're in custom mode and completed all questions
+      if (!hasNextQuestion && prev.isCustomMode) {
+        // Track the current question as used
+        const currentQuestion = prev.questions[prev.currentQuestionIndex];
+        const updatedUsedQuestions = new Set(prev.usedCustomQuestions);
+        updatedUsedQuestions.add(currentQuestion.question);
+
+        // If we've used all questions, reset the used questions set
+        if (updatedUsedQuestions.size >= prev.customQuestions.length) {
+          return {
+            ...prev,
+            currentQuestionIndex: 0,
+            usedCustomQuestions: new Set(),
+          };
+        }
+
+        // Find the next unused question
+        const unusedQuestions = prev.customQuestions.filter(
+          (q) => !updatedUsedQuestions.has(q.question)
+        );
+
+        if (unusedQuestions.length > 0) {
+          // Randomly select an unused question
+          const randomIndex = Math.floor(
+            Math.random() * unusedQuestions.length
+          );
+          const nextQuestions = [unusedQuestions[randomIndex]];
+
+          return {
+            ...prev,
+            questions: nextQuestions,
+            currentQuestionIndex: 0,
+            usedCustomQuestions: updatedUsedQuestions,
+            totalQuestions: prev.customQuestions.length,
+          };
+        }
+      }
+
+      // Regular mode or has next question
       return {
         ...prev,
         currentQuestionIndex: nextIndex,
       };
     });
-  }, [state.currentQuestionIndex, state.questions.length]);
+  }, []);
+
+  const toggleCustomMode = useCallback(
+    (enabled: boolean) => {
+      setState((prev) => ({
+        ...prev,
+        isCustomMode: enabled,
+        currentQuestionIndex: 0,
+        questions: enabled ? prev.customQuestions || [] : [],
+      }));
+
+      // If switching to regular mode, load a new question
+      if (!enabled) {
+        loadQuestion();
+      }
+    },
+    [loadQuestion]
+  );
+
+  const getCurrentQuestion = (state: QuizState) => {
+    if (!state.questions || state.questions.length === 0) {
+      return null;
+    }
+    return state.questions[state.currentQuestionIndex] || null;
+  };
+
+  const setDifficulty = useCallback(
+    (newDifficulty: Difficulty) => {
+      setState((prev) => ({
+        ...prev,
+        difficulty: newDifficulty,
+        currentQuestionIndex: 0,
+        questions: [],
+      }));
+      loadQuestion();
+    },
+    [loadQuestion]
+  );
 
   return {
-    currentQuestion: state.questions[state.currentQuestionIndex],
+    currentQuestion: getCurrentQuestion(state),
     score: state.score,
     streak: state.streak,
     difficulty: state.difficulty,
     correctAnswersInRow: state.correctAnswersInRow,
     loading,
+    setLoading,
     error,
+    setError,
     loadQuestion,
     handleAnswer,
     resetQuiz,
@@ -384,6 +353,10 @@ export const useQuiz = () => {
     answeredQuestions,
     currentLevel: state.currentLevel,
     topicProgress: state.topicProgress,
+    setState,
+    isCustomMode: state.isCustomMode,
+    toggleCustomMode,
+    setDifficulty,
     // submitQuiz,
   };
 };
