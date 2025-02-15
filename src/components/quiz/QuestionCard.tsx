@@ -4,10 +4,11 @@ import { Progress } from "@/components/ui/progress";
 import { motion } from "framer-motion";
 import { Trophy } from "lucide-react";
 import { StatsDisplay } from "./StatsDisplay";
-import { CodeBlock } from "./CodeBlock";
 import { AnswerOptions } from "./AnswerOptions";
 import { FeedbackSection } from "./FeedbackSection";
 import { useEffect } from "react";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 interface QuestionCardProps {
   currentQuestion: Question;
@@ -48,7 +49,7 @@ export function QuestionCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <Card className="bg-gray-800/50 backdrop-blur-sm border-gray-700 shadow-xl">
+      <Card className="bg-card/50 backdrop-blur-sm border-border/10 shadow-xl">
         <CardHeader className="space-y-6">
           <div className="space-y-4">
             <div className="flex justify-between items-center">
@@ -81,12 +82,19 @@ export function QuestionCard({
 
         <CardContent className="space-y-8">
           {currentQuestion?.code && (
-            <div
-              className="w-full overflow-x-auto rounded-lg bg-gray-900/50"
-              tabIndex={0}
+            <SyntaxHighlighter
+              language="javascript"
+              style={vscDarkPlus}
+              showLineNumbers
+              customStyle={{
+                background: "rgba(0, 0, 0, 0.2)",
+                padding: "1rem",
+                borderRadius: "0.5rem",
+                fontSize: "0.875rem",
+              }}
             >
-              <CodeBlock code={currentQuestion.code} language="javascript" />
-            </div>
+              {currentQuestion.code}
+            </SyntaxHighlighter>
           )}
 
           <AnswerOptions
