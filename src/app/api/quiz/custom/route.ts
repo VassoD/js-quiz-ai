@@ -190,12 +190,6 @@ Remember: Keep all answers short and simple. The correctAnswer must match one of
           };
           return {
             ...validateQuestionData(validatedQuestion, undefined, true),
-            relatedComments:
-              question.sourceComments
-                ?.map(
-                  (index) => comments.find((c) => c.index === index)?.context
-                )
-                .filter(Boolean) || [],
           };
         }
       );
