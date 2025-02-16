@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { oneDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 interface AnswerOptionsProps {
   options: string[];
@@ -25,7 +25,7 @@ export function AnswerOptions({
       return (
         <SyntaxHighlighter
           language="javascript"
-          style={oneDark}
+          style={vscDarkPlus}
           customStyle={{
             background: "transparent",
             padding: "0.5rem",
