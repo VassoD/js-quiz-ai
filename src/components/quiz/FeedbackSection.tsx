@@ -2,6 +2,7 @@ import { getFeedbackMessage, getProgressFeedback } from "@/utils/feedback";
 import { ArrowRight, CheckCircle2, XCircle } from "lucide-react";
 import { Question } from "@/types/quiz";
 import { Button } from "@/components/ui/button";
+import { memo } from "react";
 
 interface FeedbackSectionProps {
   selectedAnswer: string | null;
@@ -17,58 +18,21 @@ interface ExplanationSectionProps {
   onNextQuestion: () => void;
 }
 
-export function FeedbackSection({
-  selectedAnswer,
-  currentQuestion,
-  difficulty,
-  correctAnswersInRow,
-  onNextQuestion,
-}: FeedbackSectionProps) {
-  const isCorrect = selectedAnswer === currentQuestion?.correctAnswer;
+const FeedbackIcon = memo(({ isCorrect }: { isCorrect: boolean }) =>
+  isCorrect ? (
+    <CheckCircle2 className="w-6 h-6 text-green-600 mt-1" />
+  ) : (
+    <XCircle className="w-6 h-6 text-red-600 mt-1" />
+  )
+);
+FeedbackIcon.displayName = "FeedbackIcon";
 
-  return (
-    <div className="space-y-4">
-      <div
-        className={`p-6 rounded-xl ${
-          isCorrect
-            ? "bg-green-50 border border-green-200 text-green-800"
-            : "bg-red-50 border border-red-200 text-red-800"
-        }`}
-      >
-        <div className="flex items-start gap-3">
-          {isCorrect ? (
-            <CheckCircle2 className="w-6 h-6 text-green-600 mt-1" />
-          ) : (
-            <XCircle className="w-6 h-6 text-red-600 mt-1" />
-          )}
-          <div className="space-y-2">
-            <p className="font-semibold text-slate-800">
-              {getFeedbackMessage(isCorrect, difficulty)}
-            </p>
-            {isCorrect && (
-              <p className="text-green-700">
-                {getProgressFeedback(correctAnswersInRow)}
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <ExplanationSection
-        currentQuestion={currentQuestion}
-        selectedAnswer={selectedAnswer}
-        onNextQuestion={onNextQuestion}
-      />
-    </div>
-  );
-}
-
-function ExplanationSection({
-  currentQuestion,
-  selectedAnswer,
-  onNextQuestion,
-}: ExplanationSectionProps) {
-  return (
+const ExplanationSection = memo(
+  ({
+    currentQuestion,
+    selectedAnswer,
+    onNextQuestion,
+  }: ExplanationSectionProps) => (
     <div className="bg-white p-6 rounded-xl space-y-4 border border-gray-100 shadow-sm">
       <div>
         <p className="font-semibold text-slate-800 mb-2">
@@ -97,5 +61,45 @@ function ExplanationSection({
         Next Question
       </Button>
     </div>
+  )
+);
+ExplanationSection.displayName = "ExplanationSection";
+
+export const FeedbackSection = memo(function FeedbackSection({
+  selectedAnswer,
+  currentQuestion,
+  difficulty,
+  correctAnswersInRow,
+  onNextQuestion,
+}: FeedbackSectionProps) {
+  const isCorrect = selectedAnswer === currentQuestion?.correctAnswer;
+  const feedbackClasses = isCorrect
+    ? "bg-green-50 border border-green-200 text-green-800"
+    : "bg-red-50 border border-red-200 text-red-800";
+
+  return (
+    <div className="space-y-4">
+      <div className={`p-6 rounded-xl ${feedbackClasses}`}>
+        <div className="flex items-start gap-3">
+          <FeedbackIcon isCorrect={isCorrect} />
+          <div className="space-y-2">
+            <p className="font-semibold text-slate-800">
+              {getFeedbackMessage(isCorrect, difficulty)}
+            </p>
+            {isCorrect && (
+              <p className="text-green-700">
+                {getProgressFeedback(correctAnswersInRow)}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <ExplanationSection
+        currentQuestion={currentQuestion}
+        selectedAnswer={selectedAnswer}
+        onNextQuestion={onNextQuestion}
+      />
+    </div>
   );
-}
+});
