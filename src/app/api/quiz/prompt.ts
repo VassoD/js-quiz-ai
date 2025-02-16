@@ -57,19 +57,30 @@ export function generatePrompt(
     9. Do not combine multiple options into one answer
     10. Each option should be a complete, standalone answer
     11. MUST provide EXACTLY 4 options - no more, no less
-  
+    12. For optimization/improvement questions, options should contain actual code solutions
+    13. When showing code in options, use proper formatting with backticks
+    
     Example of INCORRECT format:
     ❌ options: ["12", "65", "18", "70", "55"]  // Wrong - has 5 options
     ❌ correctAnswer: "12 and 65"  // Wrong - combines options
-  
-    Example of CORRECT format:
+    
+    Example of CORRECT format for code-based answers:
     ✓ options: [
-      "Age under 12 or over 65",
-      "Age under 18",
-      "Age over 21",
-      "None of the above"
-    ]  // Correct - exactly 4 options
-    ✓ correctAnswer: "Age under 12 or over 65"  // Correct - matches exactly one option
+      "\`const user = { name: 'John', age: Number('30') };\`",
+      "\`const user = { name: 'John', age: parseInt('30') };\`",
+      "\`const user = { name: 'John', age: +'30' };\`",
+      "\`const user = { name: 'John', age: '30' };\`"
+    ]
+    ✓ correctAnswer: "\`const user = { name: 'John', age: Number('30') };\`"
+    
+    Example of CORRECT format for text-based answers:
+    ✓ options: [
+      "Use the Number() function to convert strings to numbers",
+      "Leave the value as a string",
+      "Use JSON.stringify() on the entire object",
+      "Remove the age property entirely"
+    ]
+    ✓ correctAnswer: "Use the Number() function to convert strings to numbers"
   
     The response must be pure JSON only.`;
 }

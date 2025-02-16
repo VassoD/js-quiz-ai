@@ -1,5 +1,7 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
 
 interface AnswerOptionsProps {
   options: string[];
@@ -16,6 +18,28 @@ export function AnswerOptions({
   showExplanation,
   onAnswerSelect,
 }: AnswerOptionsProps) {
+  const renderOptionContent = (option: string) => {
+    // Check if the option is wrapped in backticks
+    const codeMatch = option.match(/^`(.+)`$/);
+    if (codeMatch) {
+      return (
+        <SyntaxHighlighter
+          language="javascript"
+          style={oneDark}
+          customStyle={{
+            background: "transparent",
+            padding: "0.5rem",
+            margin: 0,
+            fontSize: "0.875rem",
+          }}
+        >
+          {codeMatch[1]}
+        </SyntaxHighlighter>
+      );
+    }
+    return option;
+  };
+
   return (
     <div className="grid grid-cols-1 gap-3" role="radiogroup">
       {options.map((option, index) => (
@@ -47,12 +71,14 @@ export function AnswerOptions({
               }`}
             role="radio"
             aria-checked={option === selectedAnswer}
-            aria-label={option}
+            aria-label={option.replace(/`/g, "")}
           >
-            <span className="mr-3 text-sm font-medium px-2.5 py-1.5 bg-muted/50 rounded-md">
-              {String.fromCharCode(65 + index)}
-            </span>
-            {option}
+            <div className="flex items-start gap-3">
+              <span className="text-sm font-medium px-2.5 py-1.5 bg-muted/50 rounded-md shrink-0">
+                {String.fromCharCode(65 + index)}
+              </span>
+              <div className="flex-1">{renderOptionContent(option)}</div>
+            </div>
           </Button>
         </motion.div>
       ))}
