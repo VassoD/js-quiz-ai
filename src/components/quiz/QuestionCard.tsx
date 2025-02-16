@@ -6,7 +6,7 @@ import { Trophy } from "lucide-react";
 import { StatsDisplay } from "./StatsDisplay";
 import { AnswerOptions } from "./AnswerOptions";
 import { FeedbackSection } from "./FeedbackSection";
-import { useEffect } from "react";
+import { memo, useMemo } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 
@@ -24,7 +24,60 @@ interface QuestionCardProps {
   totalQuestions: number;
 }
 
-export function QuestionCard({
+const syntaxHighlighterStyle = {
+  background: "rgba(0, 0, 0, 0.2)",
+  padding: "1rem",
+  borderRadius: "0.5rem",
+  fontSize: "0.875rem",
+} as const;
+
+const QuestionHeader = memo(
+  ({
+    questionNumber,
+    totalQuestions,
+    streak,
+    progress,
+  }: {
+    questionNumber: number;
+    totalQuestions: number;
+    streak: number;
+    progress: number;
+  }) => (
+    <div className="space-y-6">
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1 bg-indigo-500/20 text-indigo-300 rounded-full text-sm font-medium">
+              Question {questionNumber} of {totalQuestions}
+            </span>
+            {streak >= 3 && (
+              <div className="flex items-center gap-2 px-3 py-1 bg-amber-500/20 text-amber-300 rounded-full">
+                <Trophy className="w-4 h-4" />
+                <span className="text-sm font-medium">Hot Streak!</span>
+              </div>
+            )}
+          </div>
+        </div>
+        <Progress value={progress} className="h-2 bg-gray-700" />
+      </div>
+    </div>
+  )
+);
+QuestionHeader.displayName = "QuestionHeader";
+
+const CodeDisplay = memo(({ code }: { code: string }) => (
+  <SyntaxHighlighter
+    language="javascript"
+    style={vscDarkPlus}
+    showLineNumbers
+    customStyle={syntaxHighlighterStyle}
+  >
+    {code}
+  </SyntaxHighlighter>
+));
+CodeDisplay.displayName = "CodeDisplay";
+
+export const QuestionCard = memo(function QuestionCard({
   currentQuestion,
   score,
   streak,
@@ -37,11 +90,10 @@ export function QuestionCard({
   questionNumber,
   totalQuestions,
 }: QuestionCardProps) {
-  const progress = (questionNumber / totalQuestions) * 100;
-
-  useEffect(() => {
-    console.log("Rendering CodeBlock with:", currentQuestion.code);
-  }, [currentQuestion.code]);
+  const progress = useMemo(
+    () => (questionNumber / totalQuestions) * 100,
+    [questionNumber, totalQuestions]
+  );
 
   return (
     <motion.div
@@ -51,22 +103,12 @@ export function QuestionCard({
     >
       <Card className="bg-card/50 backdrop-blur-sm border-border/10 shadow-xl">
         <CardHeader className="space-y-6">
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <span className="px-3 py-1 bg-indigo-500/20 text-indigo-300 rounded-full text-sm font-medium">
-                  Question {questionNumber} of {totalQuestions}
-                </span>
-                {streak >= 3 && (
-                  <div className="flex items-center gap-2 px-3 py-1 bg-amber-500/20 text-amber-300 rounded-full">
-                    <Trophy className="w-4 h-4" />
-                    <span className="text-sm font-medium">Hot Streak!</span>
-                  </div>
-                )}
-              </div>
-            </div>
-            <Progress value={progress} className="h-2 bg-gray-700" />
-          </div>
+          <QuestionHeader
+            questionNumber={questionNumber}
+            totalQuestions={totalQuestions}
+            streak={streak}
+            progress={progress}
+          />
 
           <StatsDisplay
             score={score}
@@ -81,21 +123,7 @@ export function QuestionCard({
         </CardHeader>
 
         <CardContent className="space-y-8">
-          {currentQuestion?.code && (
-            <SyntaxHighlighter
-              language="javascript"
-              style={vscDarkPlus}
-              showLineNumbers
-              customStyle={{
-                background: "rgba(0, 0, 0, 0.2)",
-                padding: "1rem",
-                borderRadius: "0.5rem",
-                fontSize: "0.875rem",
-              }}
-            >
-              {currentQuestion.code}
-            </SyntaxHighlighter>
-          )}
+          {currentQuestion?.code && <CodeDisplay code={currentQuestion.code} />}
 
           <AnswerOptions
             options={currentQuestion?.options}
@@ -118,4 +146,4 @@ export function QuestionCard({
       </Card>
     </motion.div>
   );
-}
+});
