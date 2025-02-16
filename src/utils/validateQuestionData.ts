@@ -4,7 +4,8 @@ import { isSimilarQuestion } from "./isSimilarQuestion";
 
 export function validateQuestionData(
   data: Question,
-  excludePatterns?: string
+  excludePatterns?: string,
+  isCustomQuiz = false
 ): Question {
   console.log("Validating question data:", data);
 
@@ -12,7 +13,7 @@ export function validateQuestionData(
     throw new Error("Invalid question data format");
   }
 
-  const partialQuestion = data;
+  const partialQuestion = { ...data };
 
   if (
     !("question" in partialQuestion) ||
@@ -28,8 +29,11 @@ export function validateQuestionData(
     throw new Error("Missing or invalid options array");
   }
 
-  if (partialQuestion.options.length !== 4) {
-    throw new Error("Options must contain exactly 4 items");
+  if (
+    partialQuestion.options.length < 3 ||
+    partialQuestion.options.length > 4
+  ) {
+    throw new Error("Options must contain 3 or 4 items");
   }
 
   if (
@@ -44,20 +48,17 @@ export function validateQuestionData(
     if (typeof opt !== "string") {
       throw new Error("All options must be strings");
     }
-    // Just trim and return, no prefix handling
     return opt.trim();
   });
 
-  // Clean the correct answer the same way
-  const cleanedAnswer = partialQuestion.correctAnswer.trim();
-
-  // Find exact match
-  const correctIndex = options.findIndex((opt) => opt === cleanedAnswer);
-
-  if (correctIndex === -1) {
-    console.error("Available options:", JSON.stringify(options));
-    console.error("Correct answer:", JSON.stringify(cleanedAnswer));
-    throw new Error("Correct answer must match one of the options exactly");
+  // Validate that correctAnswer exactly matches one of the options
+  if (!options.includes(partialQuestion.correctAnswer)) {
+    console.log("Available options:", JSON.stringify(options));
+    console.log(
+      "Correct answer:",
+      JSON.stringify(partialQuestion.correctAnswer)
+    );
+    throw new Error("The correctAnswer must exactly match one of the options");
   }
 
   let code: string | null = null;
@@ -86,20 +87,25 @@ export function validateQuestionData(
     "this-keyword",
   ];
 
-  const topicString = data.topic.split(",")[0].trim();
-  if (!validTopics.includes(topicString)) {
-    throw new Error(
-      `Invalid topic: ${topicString}. Must be one of: ${validTopics.join(", ")}`
-    );
+  // Skip topic validation for custom quizzes
+  if (!isCustomQuiz) {
+    const topicString = data.topic.split(",")[0].trim();
+    if (!validTopics.includes(topicString)) {
+      throw new Error(
+        `Invalid topic: ${topicString}. Must be one of: ${validTopics.join(
+          ", "
+        )}`
+      );
+    }
   }
 
   return {
     question: partialQuestion.question,
     code,
     options,
-    correctAnswer: options[correctIndex],
+    correctAnswer: partialQuestion.correctAnswer,
     explanation: partialQuestion.explanation,
-    topic: topicString as Topic,
+    topic: isCustomQuiz ? data.topic : (data.topic as Topic),
     difficulty: partialQuestion.difficulty,
   };
 }

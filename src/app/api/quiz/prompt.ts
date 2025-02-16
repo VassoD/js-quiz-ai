@@ -36,7 +36,7 @@ export function generatePrompt(
         "Third option - wrong answer",
         "Fourth option - wrong answer"
       ],
-      "correctAnswer": "First option - correct answer",
+      "correctAnswer": "COPY-PASTE one of the options exactly",
       "explanation": "Clear explanation of why the answer is correct and others are wrong",
       "topic": "${topic}",
       "difficulty": "${difficulty}"
