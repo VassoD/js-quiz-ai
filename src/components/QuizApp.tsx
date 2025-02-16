@@ -36,6 +36,7 @@ export default function QuizApp() {
     isCustomMode,
     toggleCustomMode,
     setDifficulty,
+    isWaiting,
   } = useQuiz();
 
   const [mounted, setMounted] = useState(false);
@@ -50,7 +51,12 @@ export default function QuizApp() {
   }, [currentQuestion, loadQuestion]);
 
   if (!mounted) return null;
-  if (loading) return <LoadingCard />;
+  if (loading)
+    return (
+      <LoadingCard
+        message={isWaiting ? "Please wait a moment..." : "Loading..."}
+      />
+    );
   if (error) return <ErrorCard error={error} onRetry={loadQuestion} />;
   if (!currentQuestion) return null;
 
