@@ -137,18 +137,8 @@ export const useQuiz = () => {
   }, [state, answeredQuestions, isInitialized]);
 
   const loadQuestion = useCallback(async () => {
-    // Add check for custom mode
-    if (state.isCustomMode && state.customQuestions.length > 0) {
-      // Use existing custom questions instead of loading new ones
-      const randomIndex = Math.floor(
-        Math.random() * state.customQuestions.length
-      );
-      setState((prev) => ({
-        ...prev,
-        questions: [state.customQuestions[randomIndex]],
-        currentQuestionIndex: 0,
-        error: null,
-      }));
+    // Add check to prevent loading if there's already a valid question
+    if (state.questions[state.currentQuestionIndex]) {
       return;
     }
 
@@ -237,19 +227,15 @@ export const useQuiz = () => {
           };
 
           console.error("Server error details:", errorDetails);
-
-          // Try to extract a meaningful error message
-          let errorMessage = "Unknown server error";
-          if (typeof data === "object" && data !== null) {
-            errorMessage =
-              data.error ||
-              data.message ||
-              `Error ${response.status}: ${response.statusText}`;
-          } else if (typeof data === "string") {
-            errorMessage = data;
-          }
-
-          throw new Error(errorMessage);
+          throw new Error(
+            typeof data === "object" && data !== null
+              ? data.error ||
+                data.message ||
+                `Error ${response.status}: ${response.statusText}`
+              : typeof data === "string"
+              ? data
+              : "Unknown server error"
+          );
         }
 
         // Validate the response data
@@ -279,6 +265,9 @@ export const useQuiz = () => {
           difficulty: data.difficulty,
         });
 
+        // After successfully loading the question, add a small delay
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
         setState((prev) => ({
           ...prev,
           questions: [data],
@@ -286,19 +275,8 @@ export const useQuiz = () => {
           error: null,
         }));
       } catch (fetchError) {
-        console.error("Fetch error details:", {
-          error: fetchError,
-          message:
-            fetchError instanceof Error
-              ? fetchError.message
-              : String(fetchError),
-        });
-
-        throw new Error(
-          fetchError instanceof Error
-            ? fetchError.message
-            : "Failed to communicate with server"
-        );
+        console.error("Fetch error details:", fetchError);
+        throw fetchError; // Let the outer catch handle this
       }
     } catch (error) {
       console.error("Error in loadQuestion:", error);
@@ -307,13 +285,22 @@ export const useQuiz = () => {
       );
       setState((prev) => ({
         ...prev,
-        questions: [],
+        questions: [], // Clear questions on error
         currentQuestionIndex: 0,
       }));
+      // Add delay before retrying to prevent rapid requests on error
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // Only retry if there was a network error, not a validation error
+      if (
+        error instanceof Error &&
+        error.message.includes("Failed to communicate")
+      ) {
+        loadQuestion();
+      }
     } finally {
       setLoading(false);
     }
-  }, [state.difficulty, state.isCustomMode, state.customQuestions]);
+  }, [state.difficulty, state.currentQuestionIndex, state.questions]);
 
   const handleAnswer = useCallback(
     (answer: string) => {
@@ -392,9 +379,12 @@ export const useQuiz = () => {
         prev.questions && nextIndex < prev.questions.length;
 
       if (!hasNextQuestion) {
-        // If no next question, trigger a load with rate limiting
-        loadQuestion();
-        return prev;
+        // Instead of immediately loading, clear the current question first
+        return {
+          ...prev,
+          questions: [],
+          currentQuestionIndex: 0,
+        };
       }
 
       return {
@@ -402,7 +392,7 @@ export const useQuiz = () => {
         currentQuestionIndex: nextIndex,
       };
     });
-  }, [loadQuestion]);
+  }, []);
 
   const toggleCustomMode = useCallback(
     (enabled: boolean) => {
