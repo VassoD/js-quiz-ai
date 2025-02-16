@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { useMemo } from "react";
 
 interface AnswerOptionsProps {
   options: string[];
@@ -11,6 +12,13 @@ interface AnswerOptionsProps {
   onAnswerSelect: (answer: string) => void;
 }
 
+const syntaxHighlighterStyle = {
+  background: "transparent",
+  padding: "0.5rem",
+  margin: 0,
+  fontSize: "0.875rem",
+} as const;
+
 export function AnswerOptions({
   options,
   correctAnswer,
@@ -18,26 +26,43 @@ export function AnswerOptions({
   showExplanation,
   onAnswerSelect,
 }: AnswerOptionsProps) {
-  const renderOptionContent = (option: string) => {
-    // Check if the option is wrapped in backticks
-    const codeMatch = option.match(/^`(.+)`$/);
-    if (codeMatch) {
-      return (
-        <SyntaxHighlighter
-          language="javascript"
-          style={vscDarkPlus}
-          customStyle={{
-            background: "transparent",
-            padding: "0.5rem",
-            margin: 0,
-            fontSize: "0.875rem",
-          }}
-        >
-          {codeMatch[1]}
-        </SyntaxHighlighter>
-      );
-    }
-    return option;
+  const renderOptionContent = useMemo(() => {
+    const render = (option: string) => {
+      const codeMatch = option.match(/^`(.+)`$/);
+      if (codeMatch) {
+        return (
+          <SyntaxHighlighter
+            language="javascript"
+            style={vscDarkPlus}
+            customStyle={syntaxHighlighterStyle}
+          >
+            {codeMatch[1]}
+          </SyntaxHighlighter>
+        );
+      }
+      return option;
+    };
+    render.displayName = "RenderOptionContent";
+    return render;
+  }, []);
+
+  const getButtonVariant = (option: string) => {
+    if (!showExplanation) return "outline";
+    if (option === correctAnswer) return "default";
+    if (option === selectedAnswer) return "destructive";
+    return "outline";
+  };
+
+  const getButtonClassName = (option: string) => {
+    const baseClasses =
+      "w-full text-left justify-start p-6 h-auto transition-colors";
+    if (!showExplanation)
+      return `${baseClasses} hover:bg-muted bg-background text-foreground border`;
+    if (option === correctAnswer)
+      return `${baseClasses} bg-green-600 hover:bg-green-600 text-white font-medium`;
+    if (option === selectedAnswer)
+      return `${baseClasses} bg-red-600 text-white border-red-700`;
+    return `${baseClasses} hover:bg-muted bg-background text-foreground border`;
   };
 
   return (
@@ -52,23 +77,8 @@ export function AnswerOptions({
           <Button
             onClick={() => onAnswerSelect(option)}
             disabled={showExplanation}
-            variant={
-              showExplanation
-                ? option === correctAnswer
-                  ? "default"
-                  : option === selectedAnswer
-                  ? "destructive"
-                  : "outline"
-                : "outline"
-            }
-            className={`w-full text-left justify-start p-6 h-auto transition-colors
-              ${
-                showExplanation && option === correctAnswer
-                  ? "bg-green-600 hover:bg-green-600 text-white font-medium"
-                  : showExplanation && option === selectedAnswer
-                  ? "bg-red-600 text-white border-red-700"
-                  : "hover:bg-muted bg-background text-foreground border"
-              }`}
+            variant={getButtonVariant(option)}
+            className={getButtonClassName(option)}
             role="radio"
             aria-checked={option === selectedAnswer}
             aria-label={option.replace(/`/g, "")}
